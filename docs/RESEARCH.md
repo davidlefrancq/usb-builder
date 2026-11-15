@@ -75,6 +75,42 @@ Source : https://wiki.debian.org/SecureBoot/CAChanges
 - Firmware (EDK2) : il essaie `\EFI\BOOT\BOOTX64.EFI` sur **chaque** partition FAT, dans l'ordre des partitions. P1 passe en premier. [DOC EDK2, INF autres firmwares]
 - → Marquer seulement P1 comme ESP. Tester sur du vrai matériel.
 
+## Phase 2 — Constats sur les ISO
+
+### Ubuntu 26.04.1 Desktop (`ubuntu-26.04.1-desktop-amd64.iso`)
+- `SHA256SUMS` : signature GPG valide, clé `8439 38DF 228D 22F7 B374 2BC0 D94A A3F0 EFE2 1092` (Ubuntu CD Image Automatic Signing Key 2012). ISO : SHA256 OK.
+- `EFI/boot/bootx64.efi` = shim **15.8-0ubuntu2**, signé **Microsoft UEFI CA 2011 uniquement**.
+- `EFI/boot/grubx64.efi` = GRUB « CD » (identique à `gcdx64.efi.signed`), signé Canonical 2022 v1.
+- GRUB « disque » pour P1 : `pool/main/g/grub2-signed/grub-efi-amd64-signed_1.215+2.14-2ubuntu1_amd64.deb` → `usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed`. C'est la même version (2.14-2ubuntu1), extraite de l'ISO officielle.
+- SBAT du GRUB : `grub,5`, `grub.ubuntu,2`, `grub.peimage,2`.
+- Niveaux SBAT intégrés au shim : automatique `2023012900` (`grub,3`), latest `2024010900` (`shim,4`, `grub,3`). Le GRUB passe.
+
+### Risque SBAT identifié
+- En amont, shim définit `2025112400` (`grub,6`) et `2026092500` (`grub,7`). Source : https://raw.githubusercontent.com/rhboot/shim/main/SbatLevel_Variable.txt
+- Si une machine a déjà enregistré l'un de ces niveaux dans sa variable `SbatLevel`, le GRUB d'Ubuntu 26.04.1 (`grub,5`) **y sera refusé**. Un autre shim plus récent, ou une mise à jour, peut avoir enregistré ce niveau.
+- **Interaction à tester** : le shim de Clonezilla pourrait, en démarrant, relever `SbatLevel` et rendre ensuite notre menu inutilisable sur cette machine. → Lire le `.sbatlevel` du shim de Clonezilla avant de l'adopter.
+- → `Verify` doit afficher la génération SBAT de chaque GRUB et de chaque shim.
+
+### Clonezilla live stable 3.3.3-37 (`clonezilla-live-3.3.3-37-amd64.zip`)
+- `SHA256SUMS` : signature GPG valide, clé `54C0 821A 4871 5DAF D61B FCAF 6678 57D0 4559 9AFD` (DRBL Project). Zip : SHA256 OK.
+- `EFI/boot/bootx64.efi` = shim Debian **16.1**, **double signature : Microsoft UEFI CA 2011 et 2023**.
+- `EFI/boot/grubx64.efi` = GRUB Debian 2.14-3, signé Debian Secure Boot CA. SBAT : `grub,5`, `grub.debian,5`.
+- Niveaux SBAT intégrés au shim : automatique `2025021800` (`shim,4`, `grub,5`), latest `2025051000` (+ `grub.proxmox,2`).
+- **Interaction avec le menu** : même si ce shim relève `SbatLevel` à `2025021800`, le GRUB d'Ubuntu (`grub,5`) reste accepté. Pas de conflit.
+- Pas de `mmx64.efi` dans le zip : il ne sert que si une vérification échoue.
+- Candidat retenu, sous réserve du test Hyper-V. L'alternative (base Ubuntu) n'est testée que si la stable échoue.
+
+### Windows 11 (`Windows11_Client_x64_fr-fr_26300_9457.iso`)
+- SHA256 `AA515279F02FB2B425EFF341F0A1F158D61288C72CCA5F9D87B79B5A23F7F918` : identique à l'empreinte publiée par Microsoft (page de téléchargement, « Français 64 bits »). Pas de signature GPG chez Microsoft.
+- Build **26300**, plus récent que le 26200 étudié en phase 1. La création du compte local `admin` par `autounattend` reste **à confirmer en test**.
+- `efi/boot/bootx64.efi`, `bootmgr.efi`, `cdboot*.efi`, `memtest.efi` : tous signés **Windows Production PCA 2011**. Le média ne contient aucun chargeur signé 2023.
+- Limite : ce média ne démarre pas sur une machine qui a révoqué PCA 2011 (KB5025885). Une version signée 2023 pourrait être produite plus tard avec `Make2023BootableMedia.ps1` (hors périmètre pour l'instant).
+
+### Pièges de commande (PowerShell 5.1 → WSL)
+- Pas de guillemets doubles dans `bash -c '…'` : PowerShell 5.1 les transmet mal.
+- Échapper les jokers (`\*.efi`) : sinon `bash` les remplace par les fichiers du dossier courant.
+- Le script final évitera ces pièges : il passera par des scripts `.sh` versionnés, pas par des lignes de commande.
+
 ## autounattend.xml — faisabilité (Windows 11 25H2, build 26200)
 
 | Ligne | Faisable | Écart |
