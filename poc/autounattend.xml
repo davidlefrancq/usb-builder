@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PoC autounattend.xml for Windows 11 Pro (validated spec, see docs/RESEARCH.md).
+  - No secret: the product key is Microsoft's public generic install key for Pro (does not activate).
+  - No disk configuration: the disk to wipe is always chosen by hand in Setup.
+  - Local account "admin" with a blank password; a new password is required at the next sign-in.
+-->
+<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+
+  <settings pass="windowsPE">
+    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <SetupUILanguage>
+        <UILanguage>fr-FR</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>040c:0000040c</InputLocale>
+      <SystemLocale>fr-FR</SystemLocale>
+      <UILanguage>fr-FR</UILanguage>
+      <UserLocale>fr-FR</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <UserData>
+        <ProductKey>
+          <Key>VK7JG-NPHTM-C97JM-9MPGT-3V66T</Key>
+          <WillShowUI>OnError</WillShowUI>
+        </ProductKey>
+        <AcceptEula>true</AcceptEula>
+      </UserData>
+    </component>
+  </settings>
+
+  <settings pass="specialize">
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <TimeZone>Romance Standard Time</TimeZone>
+    </component>
+  </settings>
+
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <InputLocale>040c:0000040c</InputLocale>
+      <SystemLocale>fr-FR</SystemLocale>
+      <UILanguage>fr-FR</UILanguage>
+      <UserLocale>fr-FR</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <TimeZone>Romance Standard Time</TimeZone>
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <!-- 3 = OOBE privacy choices turned off (optional diagnostic data, advertising ID, location,
+             tailored experiences...). No group policy: the user keeps control of these settings. -->
+        <ProtectYourPC>3</ProtectYourPC>
+      </OOBE>
+      <UserAccounts>
+        <LocalAccounts>
+          <LocalAccount wcm:action="add">
+            <Name>admin</Name>
+            <DisplayName>admin</DisplayName>
+            <Group>Administrators</Group>
+            <Password>
+              <Value></Value>
+              <PlainText>true</PlainText>
+            </Password>
+          </LocalAccount>
+        </LocalAccounts>
+      </UserAccounts>
+      <FirstLogonCommands>
+        <!-- Require a new password at the next sign-in, then sign out so Windows asks for it now. -->
+        <SynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <CommandLine>net.exe user admin /logonpasswordchg:yes</CommandLine>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <CommandLine>shutdown.exe /l</CommandLine>
+        </SynchronousCommand>
+      </FirstLogonCommands>
+    </component>
+  </settings>
+
+</unattend>

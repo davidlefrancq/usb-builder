@@ -106,6 +106,17 @@ Source : https://wiki.debian.org/SecureBoot/CAChanges
 - `efi/boot/bootx64.efi`, `bootmgr.efi`, `cdboot*.efi`, `memtest.efi` : tous signés **Windows Production PCA 2011**. Le média ne contient aucun chargeur signé 2023.
 - Limite : ce média ne démarre pas sur une machine qui a révoqué PCA 2011 (KB5025885). Une version signée 2023 pourrait être produite plus tard avec `Make2023BootableMedia.ps1` (hors périmètre pour l'instant).
 
+### Premier test Hyper-V (VM Gen2, Secure Boot ON, modèle `MicrosoftUEFICertificateAuthority`)
+- Le menu GRUB s'affiche, donc shim Ubuntu (UEFI CA 2011) → GRUB « disque » → `/EFI/ubuntu/grub.cfg` fonctionne.
+- **Ubuntu (live)** démarre jusqu'au bureau, avec `SecureBoot enabled`. Le chainload du shim Ubuntu de P3 marche, et casper trouve son support sur P3.
+- **Installer Windows 11** : `error: bad shim lock signature`.
+- `db` de ce modèle (lu avec `mokutil --db`) : Microsoft Corporation UEFI CA 2011, Microsoft UEFI CA 2023, Azure Services Linux Kmod PCA. **Ni Windows Production PCA 2011, ni Windows UEFI CA 2023.**
+- → Le refus de Windows s'explique par le modèle Hyper-V, pas par la clé. Un PC certifié Windows a les deux autorités dans `db`.
+- → Hyper-V n'a **aucun modèle** qui contienne à la fois l'autorité « tiers » (pour shim) et l'autorité Windows (pour `bootmgr`). Le chainload de Windows ne peut pas être testé dans Hyper-V.
+- **Clonezilla** : le menu GRUB Debian 2.14-3 s'affiche, puis le noyau démarre. Le chainload du shim Debian de P4 est donc validé sous Secure Boot. Le démarrage **bloque** ensuite sur `Failed to disable /sys/devices/system/cpu/cpu1` : Clonezilla met les CPU secondaires hors ligne avant udev, et Hyper-V ne le permet pas (hypothèse, non testée avec 1 seul vCPU). Le test complet se fera sur un vrai PC (décision de l'utilisateur).
+- **Modèle « Microsoft Windows »** : non testé dans Hyper-V (décision de l'utilisateur). Le test se fera sur un vrai PC.
+- **Décision (2026-11-16)** : l'entrée Windows sera testée sur un **vrai PC** avec la vraie clé (option B). QEMU/OVMF dans WSL est écarté. La suite reste dans l'ordre prévu : tests Hyper-V restants, puis module (phase 3) avec ses protections de disque, puis écriture de la vraie clé (avec accord) et test réel.
+
 ### Pièges de commande (PowerShell 5.1 → WSL)
 - Pas de guillemets doubles dans `bash -c '…'` : PowerShell 5.1 les transmet mal.
 - Échapper les jokers (`\*.efi`) : sinon `bash` les remplace par les fichiers du dossier courant.
@@ -127,6 +138,7 @@ Source : https://wiki.debian.org/SecureBoot/CAChanges
 
 - **Mot de passe → option B** (2026-11-15) : compte `admin` créé sans mot de passe. Une `FirstLogonCommand` exécute `net user admin /logonpasswordchg:yes` puis ferme la session, et Windows exige un mot de passe à la connexion suivante. Ne pas activer « mot de passe sans expiration » sur ce compte.
 - **Télémétrie → minimum « Requis »** (2026-11-15) : `AllowTelemetry=1` + `ProtectYourPC=3`. La publicité, la localisation et les expériences personnalisées sont désactivées.
+- **Confidentialité → aucun verrouillage par stratégie de groupe** (2026-11-16, interdit par l'utilisateur) : uniquement `ProtectYourPC=3`, et l'utilisateur garde la main sur ses réglages. `AllowTelemetry=1` est donc retiré : c'est lui aussi une stratégie. Le niveau « Requis » doit venir de `ProtectYourPC=3`, à vérifier en test.
 - **Clé produit → clé générique d'installation Pro** (2026-11-15) : `VK7JG-NPHTM-C97JM-9MPGT-3V66T` (publique, aucune activation), `WillShowUI=OnError`. L'activation passe par la licence numérique ou OEM.
 
 Sources :
